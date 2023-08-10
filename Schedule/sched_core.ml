@@ -62,9 +62,9 @@ let rec init_sched_lecture list_session_lecture storage =
       (init_sched_a_week group4)
       (init_sched_a_week aud)
       (Std.list ( !! ) hd
-      === Std.list
-            Fun.id
-            [ group1name; group2name; group3name; group4name; teachername; subjname ])
+       === Std.list
+             Fun.id
+             [ group1name; group2name; group3name; group4name; teachername; subjname ])
       (myassoco group1name storage group1)
       (myassoco group2name storage group2)
       (myassoco group3name storage group3)
@@ -131,19 +131,15 @@ let list_of_group_and_teacher schedule lecture_plan =
     (Stdlib.List.concat
        (Stdlib.List.append
           (Stdlib.List.map
-             (fun x : string list ->
-               match x with
-               | hd1 :: hd2 :: _ -> [ hd1; hd2 ]
-               | _ -> [])
-             schedule
-            : string list list)
+             (function
+              | hd1 :: hd2 :: _ -> [ hd1; hd2 ]
+              | _ -> [])
+             schedule)
           (Stdlib.List.map
-             (fun x : string list ->
-               match x with
-               | hd1 :: hd2 :: hd3 :: hd4 :: hd5 :: _ -> [ hd1; hd2; hd3; hd4; hd5 ]
-               | _ -> [])
-             lecture_plan
-            : string list list)))
+             (function
+              | hd1 :: hd2 :: hd3 :: hd4 :: hd5 :: _ -> [ hd1; hd2; hd3; hd4; hd5 ]
+              | _ -> [])
+             lecture_plan)))
 ;;
 
 let list_of_lesson schedule lecture_plan =
@@ -282,7 +278,13 @@ let generate_schedule2 _constaints schedule lecture_plan no_formal_constr answer
     (answer === storage)
 ;;
 
-let generate_schedule _constaints schedule lecture_plan no_formal_constr answer =
+let generate_schedule
+  :  string list list -> string list list -> string list list -> string list list
+  -> (int ilogic, int ilogic Std.List.injected Std.List.injected) Pair.groundi
+     Std.List.injected
+  -> goal
+  =
+ fun _constaints schedule lecture_plan no_formal_constr answer ->
   if len schedule > 2 * len lecture_plan
   then generate_schedule1 _constaints schedule lecture_plan no_formal_constr answer
   else generate_schedule2 _constaints schedule lecture_plan no_formal_constr answer

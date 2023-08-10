@@ -1,4 +1,5 @@
 [submodule "OCanren"]
 	path = OCanren
 	url = https://github.com/Kakadu/OCanren.git
-	branch = wildcard+ppx-rec
+	branch = condeep
+
