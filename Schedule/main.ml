@@ -10,38 +10,35 @@ let func schedule lecture_plan storage =
   let storage =
     storage
     |> OCanren.Std.List.logic_to_ground_exn (function
-         | OCanren.Value (a, b) ->
-           ( List.assoc
-               (OCanren.from_logic a)
-               (anti_list_str_to_int
-                  (remove_duplicates (list_of_group_and_teacher schedule lecture_plan)))
-           , OCanren.Std.List.logic_to_ground_exn
-               (OCanren.Std.List.logic_to_ground_exn
-                  Fun.(
-                    fun x ->
-                      match x with
-                      | Value x ->
-                        List.assoc
-                          x
-                          (Stdlib.List.append
-                             (anti_list_str_to_int
-                                (remove_duplicates (list_of_lesson schedule lecture_plan)))
-                             [ -1, "окно" ])
-                      | Var _ -> ""))
-               b )
-         | Var _ -> failwith "should not happend. (DONT DO THIS)")
+      | OCanren.Value (a, b) ->
+        ( List.assoc
+            (OCanren.from_logic a)
+            (anti_list_str_to_int
+               (remove_duplicates (list_of_group_and_teacher schedule lecture_plan)))
+        , OCanren.Std.List.logic_to_ground_exn
+            (OCanren.Std.List.logic_to_ground_exn (function
+              | Value x ->
+                List.assoc
+                  x
+                  (Stdlib.List.append
+                     (anti_list_str_to_int
+                        (remove_duplicates (list_of_lesson schedule lecture_plan)))
+                     [ -1, "окно" ])
+              | Var _ -> ""))
+            b )
+      | Var _ -> failwith "should not happend. (DONT DO THIS)")
   in
   storage
   |> Array.of_list
   |> Array.map (fun (a, b) ->
-       object%js
-         val x = Js.string a
+    object%js
+      val x = Js.string a
 
-         val schedule =
-           Js.array (Array.of_list b |> Array.map Array.of_list)
-           |> Js.array_map Js.array
-           |> Js.array_map (Js.array_map Js.string)
-       end)
+      val schedule =
+        Js.array (Array.of_list b |> Array.map Array.of_list)
+        |> Js.array_map Js.array
+        |> Js.array_map (Js.array_map Js.string)
+    end)
   |> Js.array
 ;;
 
@@ -77,29 +74,29 @@ let _ =
               (map
                  to_list
                  (constraints
-                 |> Js.to_array
-                 |> Array.map Js.to_array
-                 |> Array.map (Array.map Js.to_string))))
+                  |> Js.to_array
+                  |> Array.map Js.to_array
+                  |> Array.map (Array.map Js.to_string))))
            (to_list
               (map
                  to_list
                  (schedule
-                 |> Js.to_array
-                 |> Array.map Js.to_array
-                 |> Array.map (Array.map Js.to_string))))
+                  |> Js.to_array
+                  |> Array.map Js.to_array
+                  |> Array.map (Array.map Js.to_string))))
            (to_list
               (map
                  to_list
                  (lecture_plan
-                 |> Js.to_array
-                 |> Array.map Js.to_array
-                 |> Array.map (Array.map Js.to_string))))
+                  |> Js.to_array
+                  |> Array.map Js.to_array
+                  |> Array.map (Array.map Js.to_string))))
            (to_list
               (map
                  to_list
                  (no_formal_constr
-                 |> Js.to_array
-                 |> Array.map Js.to_array
-                 |> Array.map (Array.map Js.to_string))))
+                  |> Js.to_array
+                  |> Array.map Js.to_array
+                  |> Array.map (Array.map Js.to_string))))
     end)
 ;;

@@ -2,7 +2,6 @@ open OCanren
 open OCanren.Std
 open Constraint_core
 open Init_core
-open Type_core
 
 [@@@ocaml.warnerror "-27"]
 
@@ -31,10 +30,10 @@ let rec init_sched (list_session : int list list) storage =
       (myassoco teachername storage teacher_sched)
       (Init_core.insert_lesson subjname group_sched teacher_sched aud)
       (* (debug_var storage (Fun.flip Type_core.storage_reifier) (function
-        | [ s ] ->
-          Printf.printf "%s\n%!" (String.Stdlib.List.concat " " hd);
-          success
-        | _ -> failwith "should not happen")) *)
+         | [ s ] ->
+         Printf.printf "%s\n%!" (String.Stdlib.List.concat " " hd);
+         success
+         | _ -> failwith "should not happen")) *)
       (init_sched tl storage)
 ;;
 
@@ -72,10 +71,10 @@ let rec init_sched_lecture list_session_lecture storage =
       (myassoco teachername storage teacher_sched)
       (Init_core.insert_lecture subjname group1 group2 group3 group4 teacher_sched aud)
       (* (debug_var storage (Fun.flip Type_core.storage_reifier) (function
-        | [ s ] ->
-          Printf.printf "%s\n%!" (String.Stdlib.List.concat " " hd);
-          success
-        | _ -> failwith "should not happen")) *)
+         | [ s ] ->
+         Printf.printf "%s\n%!" (String.Stdlib.List.concat " " hd);
+         success
+         | _ -> failwith "should not happen")) *)
       (init_sched_lecture tl storage)
 ;;
 
@@ -111,7 +110,6 @@ let nth l n =
 ;;
 
 let list_group_and_teacher schedule itog =
-  let open List in
   remove_duplicates
     (match schedule with
      | hd1 :: hd2 :: _ -> itog :: hd1 :: hd2
@@ -119,7 +117,6 @@ let list_group_and_teacher schedule itog =
 ;;
 
 let list_group_and_teacher_lec lecture_plan itog =
-  let open List in
   remove_duplicates
     (match lecture_plan with
      | hd1 :: hd2 :: hd3 :: hd4 :: hd5 :: _ -> itog :: hd1 :: hd2 :: hd3 :: hd4 :: hd5
@@ -284,7 +281,7 @@ let generate_schedule
      Std.List.injected
   -> goal
   =
- fun _constaints schedule lecture_plan no_formal_constr answer ->
+  fun _constaints schedule lecture_plan no_formal_constr answer ->
   if len schedule > 2 * len lecture_plan
   then generate_schedule1 _constaints schedule lecture_plan no_formal_constr answer
   else generate_schedule2 _constaints schedule lecture_plan no_formal_constr answer

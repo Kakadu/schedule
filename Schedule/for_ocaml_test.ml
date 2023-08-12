@@ -6,26 +6,24 @@ let func schedule lecture_plan storage =
   let storage =
     storage
     |> OCanren.Std.List.logic_to_ground_exn (function
-         | OCanren.Value (a, b) ->
-           ( List.assoc
-               (OCanren.from_logic a)
-               (anti_list_str_to_int
-                  (remove_duplicates (list_of_group_and_teacher schedule lecture_plan)))
-           , OCanren.Std.List.logic_to_ground_exn
-               (OCanren.Std.List.logic_to_ground_exn
-                  Fun.(
-                    fun x ->
-                      match x with
-                      | Value x ->
-                        List.assoc
-                          x
-                          (Stdlib.List.append
-                             (anti_list_str_to_int
-                                (remove_duplicates (list_of_lesson schedule lecture_plan)))
-                             [ -1, "adf" ])
-                      | Var _ -> ""))
-               b )
-         | Var _ -> failwith "should not happend. (DONT DO THIS)")
+      | OCanren.Value (a, b) ->
+        ( List.assoc
+            (OCanren.from_logic a)
+            (anti_list_str_to_int
+               (remove_duplicates (list_of_group_and_teacher schedule lecture_plan)))
+        , OCanren.Std.List.logic_to_ground_exn
+            (OCanren.Std.List.logic_to_ground_exn (function
+              | Value x ->
+                List.assoc
+                  x
+                  (Stdlib.List.append
+                     (anti_list_str_to_int
+                        (remove_duplicates (list_of_lesson schedule lecture_plan)))
+                     [ -1, "adf" ])
+                (* TODO(Kakadu): WTF is adf? *)
+              | Var _ -> ""))
+            b )
+      | Var _ -> failwith "should not happend. (DONT DO THIS)")
   in
   storage
 ;;
@@ -39,17 +37,19 @@ let schedo constraints schedule lecture_plan no_formal_constr =
   |> OCanren.Stream.take ~n:1
   |> List.map (func schedule lecture_plan)
   |> Stdlib.List.iter (fun ans ->
-       List.iter
-         (fun (x, y) ->
-           print_endline x;
-           (* List.iter (fun x -> List.iter (fun z -> Format.printf "%s" z) x) y) *)
-           List.iter (fun x -> print_endline @@ String.concat " " x) y)
-         ans)
+    List.iter
+      (fun (x, y) ->
+        print_endline x;
+        (* List.iter (fun x -> List.iter (fun z -> Format.printf "%s" z) x) y) *)
+        List.iter (fun x -> print_endline @@ String.concat " " x) y)
+      ans)
 ;;
 
 [@@@ocaml.warnerror "-35"]
 
 let _ =
+  (* TODO(Kakadu): labelled arguments are recommended in presence of two arguments of the same type *)
+  (* TODO(Kakadu): Document where we allow lists of arbitrary length, and where only of length 3 *)
   schedo
     [ [ "2021pi-1"; "tuesday"; "4" ]
     ; [ "2021pi-1"; "friday"; "5" ]
