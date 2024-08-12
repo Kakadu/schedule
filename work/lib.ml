@@ -1,3 +1,5 @@
+type group_id = int
+
 module Lesson = struct
   type id = int
 
@@ -56,10 +58,43 @@ module Teacher = struct
   let init_schedule t : Schedule.injected -> OCanren.goal =
     fun sh ->
     let open OCanren in
-    fresh (mon tu we thu fri sat) (sh === Std.list Fun.id [ mon; tu; we; thu; fri; sat ])
+    let wrap day arr =
+      fresh
+        (l1 l2 l3 l4)
+        (day === Std.list Fun.id [ l1; l2; l3; l4 ])
+        (if arr.(0) then success else l1 === Para.blank)
+        (if arr.(1) then success else l2 === Para.blank)
+        (if arr.(2) then success else l3 === Para.blank)
+        (if arr.(3) then success else l4 === Para.blank)
+    in
+    fresh
+      (mon tu we thu fri sat)
+      (sh === Std.list Fun.id [ mon; tu; we; thu; fri; sat ])
+      (wrap mon t.arr.(0))
+      (wrap tu t.arr.(1))
+      (wrap we t.arr.(2))
+      (wrap thu t.arr.(3))
+      (wrap fri t.arr.(4))
+      (wrap sat t.arr.(5))
+  ;;
+
+  let arr_foldi f acc arr =
+    let rec helper acc i =
+      if i >= Array.length arr then acc else helper (f i acc arr.(i)) (1 + i)
+    in
+    helper acc 0
+  ;;
+
+  let placeo t teacher_sched group_sched v =
+    arr_foldi (fun i acc -> arr_foldi (fun j acc _ -> acc) acc) OCanren.failure t.arr
   ;;
 end
 
 module Plan = struct
-  type t = (Lesson.id * Teacher.id) list
+  type t = (group_id * Lesson.id * Teacher.id) list
 end
+
+let synth get_teacher_sched get_group_sched plan =
+  let open OCanren in
+  List.fold_left (fun acc (group_sched, les_id, tchr_id) -> acc) success plan
+;;
