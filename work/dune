@@ -1,0 +1,27 @@
+(env
+ (_
+  (flags
+   (:standard -rectypes -warn-error -unused-var-strict))))
+
+(executable
+ (name test)
+ (modules test)
+ (libraries lib)
+ (preprocess
+  (pps OCanren-ppx.ppx_distrib)))
+
+(library
+ (name lib)
+ (modules lib)
+ (libraries OCanren)
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_distrib
+   OCanren-ppx.ppx_fresh
+   GT.ppx_all
+   -- ;-locations-check -check
+      ; https://ocaml-ppx.github.io/ppxlib/ppxlib/good-practices.html
+   )))
+
+(cram
+ (deps ./test.exe))
