@@ -1,7 +1,4 @@
-[submodule "GT"]
-	path = GT
-	url = https://github.com/PLTools/GT.git
 [submodule "OCanren"]
 	path = OCanren
 	url = https://github.com/Kakadu/OCanren.git
-	branch = wildcards+var_ordering+condeep
+	branch = wildcards+condeep-2024
