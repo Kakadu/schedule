@@ -33,7 +33,10 @@ module Int_set = Set.Make (Int)
 let run teachers plan : _ =
   let _ : Plan.t = plan in
   let all_groups =
-    List.fold_left (fun acc (gid, _, _) -> Int_set.add gid acc) Int_set.empty plan
+    List.fold_left
+      (fun acc { Plan_item.group_id; _ } -> Int_set.add group_id acc)
+      Int_set.empty
+      plan
   in
   let group_shedules : (group_id, Schedule.injected) Hashtbl.t =
     Hashtbl.create (Int_set.cardinal all_groups)
@@ -44,8 +47,8 @@ let run teachers plan : _ =
         let open OCanren in
         Fresh.one (fun shed ->
           Hashtbl.add group_shedules gid shed;
-          log "Group shedules count = %d" (Hashtbl.length group_shedules);
-          log "all_groups count = %d" (Int_set.cardinal all_groups);
+          (* log "Group shedules count = %d" (Hashtbl.length group_shedules); *)
+          (* log "all_groups count = %d" (Int_set.cardinal all_groups); *)
           acc &&& Lib.init_empty_schedule shed))
       all_groups
       OCanren.success
@@ -59,15 +62,15 @@ let run teachers plan : _ =
         let open OCanren in
         Fresh.one (fun shed ->
           Hashtbl.add teacher_shedules teacher.Teacher.id shed;
-          log "add to teachers shedule with key = %s" teacher.Teacher.id;
+          (* log "add to teachers shedule with key = %s" teacher.Teacher.id; *)
           acc &&&& Teacher.init_schedule teacher shed))
       OCanren.success
       teachers
   in
   let get_teacher tid = List.find (fun { Teacher.id; _ } -> tid = id) teachers in
   let get_teacher_sched tid =
-    log "Teacher shedules count = %d" (Hashtbl.length teacher_shedules);
-    log "Teachers count = %d" (List.length teachers);
+    (* log "Teacher shedules count = %d" (Hashtbl.length teacher_shedules); *)
+    (* log "Teachers count = %d" (List.length teachers); *)
     try Hashtbl.find teacher_shedules tid with
     | Not_found -> Format.kasprintf failwith "Can't get schedule for teacher %s" tid
   in
@@ -90,14 +93,25 @@ let cfg = { out_tex_file = "" }
 
 let test1 () =
   Plan.clear ();
-  let teachers = [ Teacher.create "Kakadu" [ Bad_day 3 ] ] in
-  let plan =
+  let teachers = [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ] ] in
+  let plan : Plan.pre_plan =
     [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
+    ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
+    ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
+    ; Plan.make ~cstrnts:[ Dont_ovelap "ТП3" ] ~g:"ТП4" ~t:"Kakadu" "ФП"
     ]
   in
   let g_sched, teachers_sched = run teachers plan |> OCanren.Stream.hd in
+  let g_sched =
+    List.sort
+      (fun (a, _) (b, _) -> String.compare (Plan.group_of_id a) (Plan.group_of_id b))
+      g_sched
+  in
+  let teachers_sched =
+    List.sort (fun (a, _) (b, _) -> String.compare a b) teachers_sched
+  in
   if cfg.out_tex_file <> ""
   then
     Out_channel.with_open_text cfg.out_tex_file (fun ch ->

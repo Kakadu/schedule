@@ -5,6 +5,7 @@ let log fmt =
 ;;
 
 type group_id = int
+type teacher_id = string
 
 module Lesson = struct
   type id = string
@@ -64,6 +65,8 @@ module Schedule = struct
        | 3 -> para === para4
        | _ -> assert false)
   ;;
+
+  let make_window sched i j = is sched i j Para.blank
 end
 
 let init_empty_schedule : Schedule.injected -> OCanren.goal =
@@ -80,6 +83,17 @@ let init_empty_schedule : Schedule.injected -> OCanren.goal =
     (wrap fri)
     (wrap sat)
 ;;
+
+module Plan_item = struct
+  type 'gid cstrnt = Dont_ovelap of 'gid
+
+  type 'gid t =
+    { group_id : group_id
+    ; lesson_id : Lesson.id
+    ; teacher_id : teacher_id
+    ; constraints : 'gid cstrnt list
+    }
+end
 
 module Teacher = struct
   type id = string
@@ -135,9 +149,20 @@ module Teacher = struct
     helper acc 0
   ;;
 
-  let placeo t teacher_sched group_sched v =
+  let apply_para_constraints ~get_group_sched i j cstrnts =
+    let open OCanren in
+    List.fold_left
+      (fun acc (Plan_item.Dont_ovelap other_gid) ->
+        acc &&&& Schedule.make_window (get_group_sched other_gid) i j)
+      success
+      cstrnts
+  ;;
+
+  let placeo ~get_group_sched t teacher_sched group_sched item =
+    let { Plan_item.group_id; teacher_id; lesson_id; _ } = item in
     let _ : Schedule.injected = teacher_sched in
     let _ : Schedule.injected = group_sched in
+    let para = Para.lesson ~group_id ~teacher_id ~course_id:lesson_id in
     let open OCanren in
     arr_foldi
       (fun i acc ->
@@ -146,7 +171,15 @@ module Teacher = struct
             if t.arr.(i).(j)
             then
               conde
-                [ acc; Schedule.is teacher_sched i j v &&& Schedule.is group_sched i j v ]
+                [ acc
+                ; Schedule.is teacher_sched i j para
+                  &&& Schedule.is group_sched i j para
+                  &&&& apply_para_constraints
+                         ~get_group_sched
+                         i
+                         j
+                         item.Plan_item.constraints
+                ]
             else acc)
           acc)
       OCanren.failure
@@ -155,7 +188,8 @@ module Teacher = struct
 end
 
 module Plan = struct
-  type t = (group_id * Lesson.id * Teacher.id) list
+  type t = group_id Plan_item.t list
+  type pre_plan = string Plan_item.t list
 
   type collection =
     { group_of_id : (int, string) Hashtbl.t
@@ -175,8 +209,8 @@ module Plan = struct
 
   let group_of_id = Hashtbl.find col.group_of_id
 
-  let make ~g ~t lesson =
-    let gid =
+  let make ?(cstrnts = []) ~g ~t lesson_id =
+    let group_id =
       match Hashtbl.find col.id_of_group g with
       | id -> id
       | exception Not_found ->
@@ -186,23 +220,18 @@ module Plan = struct
         Hashtbl.replace col.group_of_id id g;
         id
     in
-    gid, lesson, t
+    { Plan_item.group_id; lesson_id; teacher_id = t; constraints = cstrnts }
   ;;
 end
 
 let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
   let open OCanren in
   Stdlib.List.fold_left
-    (fun acc (group_id, course_id, teacher_id) ->
+    (fun acc ({ Plan_item.group_id; teacher_id; _ } as item) ->
       let teacher_sched = get_teacher_sched teacher_id in
       let group_sched = get_group_sched group_id in
       let teacher = get_teacher teacher_id in
-      acc
-      &&& Teacher.placeo
-            teacher
-            teacher_sched
-            group_sched
-            (Para.lesson ~group_id ~teacher_id ~course_id))
+      acc &&& Teacher.placeo ~get_group_sched teacher teacher_sched group_sched item)
     success
     plan
 ;;
