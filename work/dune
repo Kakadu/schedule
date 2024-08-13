@@ -6,22 +6,53 @@
 (executable
  (name test)
  (modules test)
- (libraries lib)
+ (libraries Types)
  (preprocess
-  (pps OCanren-ppx.ppx_distrib)))
+  (pps
+   OCanren-ppx.ppx_distrib
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_deriving_reify
+   GT.ppx_all
+   -- ;
+   )))
 
 (library
- (name lib)
- (modules lib)
+ (name Types)
+ (wrapped false)
+ (modules Lib Pprinter)
  (libraries OCanren)
  (preprocess
   (pps
    OCanren-ppx.ppx_distrib
    OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_deriving_reify
    GT.ppx_all
    -- ;-locations-check -check
       ; https://ocaml-ppx.github.io/ppxlib/ppxlib/good-practices.html
    )))
 
 (cram
- (deps ./test.exe))
+ (deps
+  ./test.exe
+  test1.tex
+  test1.pdf
+  ;
+  ))
+
+(rule
+ (targets test1.tex)
+ (mode
+  (promote (until-clean)))
+ (action
+  (setenv
+   OCAMLRUNPARAM
+   b
+   (run ./test.exe -tex %{targets} -test1))))
+
+(rule
+ (targets test1.pdf)
+ (deps test1.tex)
+ (mode
+  (promote (until-clean)))
+ (action
+  (run xelatex --interaction=errorstopmode %{deps})))
