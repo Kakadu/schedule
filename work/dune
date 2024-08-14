@@ -56,3 +56,24 @@
   (promote (until-clean)))
  (action
   (run xelatex --interaction=errorstopmode %{deps})))
+
+(library
+ (name tests)
+ (modules tests)
+ (libraries Types OCanren.tester)
+ (inline_tests)
+ ;  (flags
+ ;   (:standard -dsource))
+ (preprocess
+  (pps
+   OCanren-ppx.ppx_distrib
+   OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_wildcard
+   OCanren-ppx.ppx_tester
+   OCanren-ppx.ppx_deriving_reify
+   ;ppx_expect_nobase
+   ppx_expect
+   GT.ppx_all
+   -- ;-locations-check -check
+      ; https://ocaml-ppx.github.io/ppxlib/ppxlib/good-practices.html
+   )))

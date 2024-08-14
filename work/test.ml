@@ -95,7 +95,15 @@ let cfg = { out_tex_file = "" }
 let test1 () =
   Plan.clear ();
   let teachers =
-    [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]; Teacher.create "Соловьёв" [] ]
+    [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]
+    ; Teacher.create "Соловьёв" []
+    ; Teacher.create "Виденский" []
+    ; Teacher.create "Невзоров" []
+    ; Teacher.create "ТеорВ-практик" []
+    ; Teacher.create "Рябов" []
+    ; Teacher.create "Евдокимова" []
+    ; Teacher.create "Хит" []
+    ]
   in
   let plan : Plan.pre_plan =
     [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
@@ -103,8 +111,16 @@ let test1 () =
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
     ; Plan.make ~cstrnts:[ Hardcode (1, 1) ] ~g:"ТП4" ~t:"Соловьёв" "ТВПиС"
-    ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
     ; Plan.make ~cstrnts:[ Dont_ovelap "ТП3" ] ~g:"ТП4" ~t:"Kakadu" "ФП"
+    ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
+    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
+    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
+    ; Plan.make ~g:"ТП3" ~t:"Невзоров" "Теорвер Л"
+    ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
+    ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
+    ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
+    ; Plan.make ~g:"ТП3" ~t:"Хит" "ТФЯТ 1"
+    ; Plan.make ~g:"ТП3" ~t:"Хит" "ТФЯТ 2"
     ]
   in
   let g_sched, teachers_sched = run teachers plan |> OCanren.Stream.hd in

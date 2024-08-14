@@ -23,7 +23,7 @@ module Para = struct
     type nonrec ground =
       | Window
       | Lesson of GT.int * GT.string * GT.string
-    [@@deriving gt ~options:{ gmap }]]
+    [@@deriving gt ~options:{ gmap; show }]]
 
   let blank : injected = OCanren.( !! ) Window
 
