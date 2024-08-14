@@ -33,6 +33,16 @@ module Para = struct
   ;;
 end
 
+let conj_map ~f xs =
+  let open OCanren in
+  List.fold_left (fun acc x -> acc &&& f x) success xs
+;;
+
+let condeep_map ~f xs =
+  let open OCanren in
+  List.fold_left (fun acc x -> condeep [ acc; f x ]) failure xs
+;;
+
 module Schedule = struct
   open OCanren
 
@@ -85,7 +95,9 @@ let init_empty_schedule : Schedule.injected -> OCanren.goal =
 ;;
 
 module Plan_item = struct
-  type 'gid cstrnt = Dont_ovelap of 'gid
+  type 'gid cstrnt =
+    | Dont_ovelap of 'gid
+    | Hardcode of int * int
 
   type 'gid t =
     { group_id : group_id
@@ -102,6 +114,7 @@ module Teacher = struct
     { id : id
     ; constraints : Constraint.t list
     ; arr : bool array array
+    ; indexes : (int * int) list
     }
 
   let create id constraints =
@@ -116,7 +129,13 @@ module Teacher = struct
         for i = 0 to 6 - 1 do
           arr.(i).(n) <- false
         done);
-    { id; constraints; arr }
+    let indexes = ref [] in
+    for i = 0 to 5 do
+      for j = 0 to 3 do
+        if arr.(i).(j) then indexes := (i, j) :: !indexes
+      done
+    done;
+    { id; constraints; arr; indexes = !indexes }
   ;;
 
   let init_schedule t : Schedule.injected -> OCanren.goal =
@@ -152,10 +171,28 @@ module Teacher = struct
   let apply_para_constraints ~get_group_sched i j cstrnts =
     let open OCanren in
     List.fold_left
-      (fun acc (Plan_item.Dont_ovelap other_gid) ->
-        acc &&&& Schedule.make_window (get_group_sched other_gid) i j)
+      (fun acc -> function
+        | Plan_item.Dont_ovelap other_gid ->
+          acc &&&& Schedule.make_window (get_group_sched other_gid) i j
+        | Hardcode _ ->
+          (* We don't apply the constraint because it will be applied elsewhere *)
+          acc)
       success
       cstrnts
+  ;;
+
+  let shrink_placement t constraints =
+    match
+      List.find_map
+        (function
+          | Plan_item.Hardcode (a, b) -> Some (a, b)
+          | _ -> None)
+        constraints
+    with
+    | Some pos -> List.filter (( = ) pos) t.indexes
+    | None ->
+      (* TODO: support don't overlap *)
+      t.indexes
   ;;
 
   let placeo ~get_group_sched t teacher_sched group_sched item =
@@ -164,14 +201,20 @@ module Teacher = struct
     let _ : Schedule.injected = group_sched in
     let para = Para.lesson ~group_id ~teacher_id ~course_id:lesson_id in
     let open OCanren in
-    arr_foldi
-      (fun i acc ->
-        arr_foldi
-          (fun j acc _ ->
-            if t.arr.(i).(j)
-            then
-              conde
-                [ acc
+    condeep_map (shrink_placement t item.constraints) ~f:(fun (i, j) ->
+      Schedule.is teacher_sched i j para
+      &&& Schedule.is group_sched i j para
+      &&&& apply_para_constraints ~get_group_sched i j item.constraints)
+  ;;
+
+  (* arr_foldi
+     (fun i acc ->
+     arr_foldi
+     (fun j acc _ ->
+     if t.arr.(i).(j)
+     then
+     conde
+     [ acc
                 ; Schedule.is teacher_sched i j para
                   &&& Schedule.is group_sched i j para
                   &&&& apply_para_constraints
@@ -180,11 +223,10 @@ module Teacher = struct
                          j
                          item.Plan_item.constraints
                 ]
-            else acc)
-          acc)
-      OCanren.failure
-      t.arr
-  ;;
+     else acc)
+     acc)
+     OCanren.failure
+     t.arr *)
 end
 
 module Plan = struct
@@ -221,6 +263,19 @@ module Plan = struct
         id
     in
     { Plan_item.group_id; lesson_id; teacher_id = t; constraints = cstrnts }
+  ;;
+
+  let of_pre_plan : pre_plan -> t =
+    List.map (fun ({ Plan_item.constraints; _ } as item) ->
+      let constraints =
+        List.map
+          (function
+            | Plan_item.Dont_ovelap gname ->
+              Plan_item.Dont_ovelap (Hashtbl.find col.id_of_group gname)
+            | Hardcode _ as c -> c)
+          constraints
+      in
+      { item with constraints })
   ;;
 end
 

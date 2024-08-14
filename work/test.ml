@@ -31,7 +31,7 @@ end
 module Int_set = Set.Make (Int)
 
 let run teachers plan : _ =
-  let _ : Plan.t = plan in
+  let _ : Plan.pre_plan = plan in
   let all_groups =
     List.fold_left
       (fun acc { Plan_item.group_id; _ } -> Int_set.add group_id acc)
@@ -75,6 +75,7 @@ let run teachers plan : _ =
     | Not_found -> Format.kasprintf failwith "Can't get schedule for teacher %s" tid
   in
   let get_group_sched tid = Hashtbl.find group_shedules tid in
+  let plan = Plan.of_pre_plan plan in
   OCanren.(run one)
     (fun sheds ->
       let open OCanren in
@@ -93,12 +94,15 @@ let cfg = { out_tex_file = "" }
 
 let test1 () =
   Plan.clear ();
-  let teachers = [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ] ] in
+  let teachers =
+    [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]; Teacher.create "Соловьёв" [] ]
+  in
   let plan : Plan.pre_plan =
     [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
+    ; Plan.make ~cstrnts:[ Hardcode (1, 1) ] ~g:"ТП4" ~t:"Соловьёв" "ТВПиС"
     ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
     ; Plan.make ~cstrnts:[ Dont_ovelap "ТП3" ] ~g:"ТП4" ~t:"Kakadu" "ФП"
     ]
