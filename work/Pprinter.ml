@@ -29,7 +29,9 @@ let footer ppf () = fprintf ppf {|\end{document} %!|}
 let pp_para kind pp_gid ppf =
   let open OCanren in
   function
-  | OCanren.Var _ -> ()
+  | OCanren.Var _ ->
+    (* print_endline ([%show: Para.logic] () v); *)
+    ()
   | OCanren.Value Para.Window -> fprintf ppf "---"
   | Value (Lesson (OCanren.Value gid, Value tid, Value lesid)) ->
     (match kind with

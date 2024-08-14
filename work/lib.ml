@@ -94,6 +94,36 @@ let init_empty_schedule : Schedule.injected -> OCanren.goal =
     (wrap sat)
 ;;
 
+let schedule_without_windows : Schedule.injected -> OCanren.goal =
+  fun sh ->
+  let open OCanren in
+  let wrap ?(hack = false) day =
+    fresh
+      (l1 l2 l3 l4)
+      (day === Std.list Fun.id [ l1; l2; l3; l4 ])
+      (* (Std.triple l1 l2 l3
+         =/= Std.triple !!(Para.Lesson (__, __, __)) Para.blank !!(Para.Lesson (__, __, __))
+         ) *)
+      (if hack
+       then
+         Std.triple l2 l3 l4
+         =/= Std.triple
+               !!(Para.Lesson (__, __, __))
+               Para.blank
+               !!(Para.Lesson (__, __, __))
+       else success)
+  in
+  fresh
+    (mon tu we thu fri sat)
+    (sh === Std.list Fun.id [ mon; tu; we; thu; fri; sat ])
+    (wrap mon)
+    (wrap tu)
+    (wrap ~hack:true we)
+    (wrap ~hack:true thu)
+    (wrap fri)
+    (wrap ~hack:true sat)
+;;
+
 module Plan_item = struct
   type 'gid cstrnt =
     | Dont_ovelap of 'gid

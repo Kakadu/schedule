@@ -10,20 +10,20 @@ let%expect_test "" =
       eta
   in
   [%tester run 1 (fun q -> constraint1 q)];
-  [%expect "
+  [%expect {|
     fun q -> constraint1 q, 1 answer {
     q=_.10 [=/= (_.11 [=/= 1], 1, _.12 [=/= 1])];
-    }"];
+    } |}];
   [%tester run 1 (fun q -> constraint1 q &&& (q === Std.triple !!1 !!2 !!1))];
-  [%expect "
+  [%expect {|
     fun q -> (constraint1 q) &&& (q === (Std.triple (!! 1) (!! 2) (!! 1))), 1 answer {
     q=(1, 2, 1);
-    }"];
+    } |}];
   [%tester run 1 (fun q -> constraint1 q &&& (q === Std.triple !!2 !!1 !!2))];
-  [%expect "
+  [%expect {|
     fun q -> (constraint1 q) &&& (q === (Std.triple (!! 2) (!! 1) (!! 2))), 1 answer {
     q=(2, 1, 2);
-    }"];
+    } |}];
   ()
 ;;
 
@@ -45,26 +45,26 @@ let%expect_test "" =
   in
   let filled_para = lesson !!1 !!"1" !!"1" in
   [%tester run 1 (fun q -> constraint1 q)];
-  [%expect "
+  [%expect {|
     fun q -> constraint1 q, 1 answer {
     q=_.10 [=/= (Lesson (_.-42, _.-42, _.-42), Window, Lesson (_.-42, _.-42, _.-42))];
-    }"];
+    } |}];
   (* Good case *)
   [%tester
     run 1 (fun q ->
       constraint1 q &&& (q === Std.triple Para.blank Para.blank filled_para))];
-  [%expect "
+  [%expect {|
     fun q ->
       (constraint1 q) &&& (q === (Std.triple Para.blank Para.blank filled_para)), 1 answer {
-    q=(Window, Window, Lesson (1, \"1\", \"1\"));
-    }"];
+    q=(Window, Window, Lesson (1, "1", "1"));
+    } |}];
   (* Bad case *)
   [%tester
     run 1 (fun q ->
       constraint1 q &&& (q === Std.triple filled_para Para.blank filled_para))];
-  [%expect "
+  [%expect {|
     fun q ->
       (constraint1 q) &&& (q === (Std.triple filled_para Para.blank filled_para)), 1 answer {
-    }"];
+    } |}];
   ()
 ;;

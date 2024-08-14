@@ -30,6 +30,14 @@ end
 
 module Int_set = Set.Make (Int)
 
+let measure f x =
+  let start = Mtime_clock.elapsed () in
+  let ans = f x in
+  let fin = Mtime_clock.elapsed () in
+  let diff = Mtime.Span.abs_diff start fin in
+  Int64.(div (Mtime.Span.to_uint64_ns diff) 1_000_000L), ans
+;;
+
 let run teachers plan : _ =
   let _ : Plan.pre_plan = plan in
   let all_groups =
@@ -49,7 +57,7 @@ let run teachers plan : _ =
           Hashtbl.add group_shedules gid shed;
           (* log "Group shedules count = %d" (Hashtbl.length group_shedules); *)
           (* log "all_groups count = %d" (Int_set.cardinal all_groups); *)
-          acc &&& Lib.init_empty_schedule shed))
+          acc &&& Lib.init_empty_schedule shed &&& Lib.schedule_without_windows shed))
       all_groups
       OCanren.success
   in
@@ -76,16 +84,28 @@ let run teachers plan : _ =
   in
   let get_group_sched tid = Hashtbl.find group_shedules tid in
   let plan = Plan.of_pre_plan plan in
-  OCanren.(run one)
-    (fun sheds ->
-      let open OCanren in
-      init_teacher_sheds
-      &&&& init_group_sheds
-      &&&& debug_var !!1 OCanren.reify (fun _ ->
-        inject_into_single ~group_shedules ~teacher_shedules sheds)
-      &&&& delay (fun () ->
-        Lib.synth get_teacher ~get_teacher_sched ~get_group_sched plan))
-    (fun (shed : _ OCanren.reified) : _ -> shed#reify reify_delogic_sheds)
+  let time1, state1 =
+    measure
+      (fun () ->
+        OCanren.(run one)
+          (fun sheds ->
+            let open OCanren in
+            init_teacher_sheds
+            &&&& init_group_sheds
+            &&&& debug_var !!1 OCanren.reify (fun _ ->
+              inject_into_single ~group_shedules ~teacher_shedules sheds)
+            &&&& delay (fun () ->
+              Lib.synth get_teacher ~get_teacher_sched ~get_group_sched plan))
+          Fun.id
+        |> OCanren.Stream.hd)
+      ()
+  in
+  let time2, ans =
+    measure (fun (shed : _ OCanren.reified) : _ -> shed#reify reify_delogic_sheds) state1
+  in
+  Format.printf " Synthesis  time %Ld ms\n" time1;
+  Format.printf " Reification time %Ld ms\n" time2;
+  ans
 ;;
 
 type config = { mutable out_tex_file : string }
@@ -103,6 +123,7 @@ let test1 () =
     ; Teacher.create "Рябов" []
     ; Teacher.create "Евдокимова" []
     ; Teacher.create "Хит" []
+    ; Teacher.create "Мод.дин.сис." []
     ]
   in
   let plan : Plan.pre_plan =
@@ -110,6 +131,7 @@ let test1 () =
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
+    ; Plan.make ~g:"ТП4" ~t:"Мод.дин.сис." "Мод.дин.сис."
     ; Plan.make ~cstrnts:[ Hardcode (1, 1) ] ~g:"ТП4" ~t:"Соловьёв" "ТВПиС"
     ; Plan.make ~cstrnts:[ Dont_ovelap "ТП3" ] ~g:"ТП4" ~t:"Kakadu" "ФП"
     ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
@@ -123,7 +145,7 @@ let test1 () =
     ; Plan.make ~g:"ТП3" ~t:"Хит" "ТФЯТ 2"
     ]
   in
-  let g_sched, teachers_sched = run teachers plan |> OCanren.Stream.hd in
+  let g_sched, teachers_sched = run teachers plan in
   let g_sched =
     List.sort
       (fun (a, _) (b, _) -> String.compare (Plan.group_of_id a) (Plan.group_of_id b))

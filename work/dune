@@ -6,7 +6,7 @@
 (executable
  (name test)
  (modules test)
- (libraries Types)
+ (libraries Types mtime.clock.os)
  (preprocess
   (pps
    OCanren-ppx.ppx_distrib
@@ -25,6 +25,7 @@
   (pps
    OCanren-ppx.ppx_distrib
    OCanren-ppx.ppx_fresh
+   OCanren-ppx.ppx_wildcard
    OCanren-ppx.ppx_deriving_reify
    GT.ppx_all
    -- ;-locations-check -check
