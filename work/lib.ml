@@ -18,6 +18,7 @@ module Constraint = struct
     | Bad_day of int
 end
 
+(* Teacher's lesson *)
 module Para = struct
   [%%ocanren_inject
     type nonrec ground =
@@ -33,6 +34,21 @@ module Para = struct
   ;;
 end
 
+module Stud_para = struct
+  [%%ocanren_inject
+    type nonrec ground =
+      | Elective of GT.string * GT.string
+      | Default of Para.ground
+    [@@deriving gt ~options:{ gmap; show }]]
+
+  let elective ~teacher_id ~course_id : injected =
+    let open OCanren in
+    elective !!teacher_id !!course_id
+  ;;
+
+  let blank : injected = default Para.blank
+end
+
 let conj_map ~f xs =
   let open OCanren in
   List.fold_left (fun acc x -> acc &&& f x) success xs
@@ -46,15 +62,14 @@ let condeep_map ~f xs =
 module Schedule = struct
   open OCanren
 
-  type injected = Para.injected Std.List.injected Std.List.injected
-  type logic = Para.logic Std.List.logic Std.List.logic
-  type reifed = Para.logic Std.List.ground Std.List.ground
+  type 'para injected = 'para Std.List.injected Std.List.injected
+  type 'para logic = 'para Std.List.logic Std.List.logic
+  type 'para reifed = 'para Std.List.ground Std.List.ground
 
-  let reify : (injected, reifed) Reifier.t =
-    Std.List.prj_exn (Std.List.prj_exn Para.reify)
-  ;;
+  let reify r : (_ injected, _ reifed) Reifier.t = Std.List.prj_exn (Std.List.prj_exn r)
 
   let is sched i j para =
+    let _ : _ injected = sched in
     let open OCanren in
     fresh
       (m tu w th fr sa day para1 para2 para3 para4)
@@ -94,7 +109,11 @@ module Schedule = struct
   ;;
 end
 
-let init_empty_schedule : Schedule.injected -> OCanren.goal =
+module Stud_schedule = struct
+  type injected = Stud_para.injected Schedule.injected
+end
+
+let init_empty_schedule : _ Schedule.injected -> OCanren.goal =
   fun sh ->
   let open OCanren in
   let wrap day = fresh (l1 l2 l3 l4) (day === Std.list Fun.id [ l1; l2; l3; l4 ]) in
@@ -109,7 +128,7 @@ let init_empty_schedule : Schedule.injected -> OCanren.goal =
     (wrap sat)
 ;;
 
-let schedule_without_windows : Schedule.injected -> OCanren.goal =
+let schedule_without_windows : Para.injected Schedule.injected -> OCanren.goal =
   fun sh ->
   let open OCanren in
   let wrap ?(hack = false) day =
@@ -145,11 +164,16 @@ module Plan_item = struct
     | Hardcode of int * int
 
   type 'gid t =
-    { group_id : group_id
-    ; lesson_id : Lesson.id
-    ; teacher_id : teacher_id
-    ; constraints : 'gid cstrnt list
-    }
+    | Normal of
+        { group_id : group_id
+        ; lesson_id : Lesson.id
+        ; teacher_id : teacher_id
+        ; constraints : 'gid cstrnt list
+        }
+    | Elective of
+        { group_id : group_id
+        ; electives : (teacher_id * Lesson.id) list
+        }
 end
 
 module Teacher = struct
@@ -183,7 +207,9 @@ module Teacher = struct
     { id; constraints; arr; indexes = !indexes }
   ;;
 
-  let init_schedule t : Schedule.injected -> OCanren.goal =
+  type schedule_injected = Para.injected Schedule.injected
+
+  let init_schedule t : schedule_injected -> OCanren.goal =
     fun sh ->
     let open OCanren in
     let wrap day arr =
@@ -240,16 +266,19 @@ module Teacher = struct
       t.indexes
   ;;
 
-  let placeo ~get_group_sched t teacher_sched group_sched item =
-    let { Plan_item.group_id; teacher_id; lesson_id; _ } = item in
-    let _ : Schedule.injected = teacher_sched in
-    let _ : Schedule.injected = group_sched in
-    let para = Para.lesson ~group_id ~teacher_id ~course_id:lesson_id in
-    let open OCanren in
-    condeep_map (shrink_placement t item.constraints) ~f:(fun (i, j) ->
-      Schedule.is teacher_sched i j para
-      &&& Schedule.is group_sched i j para
-      &&&& apply_para_constraints ~get_group_sched i j item.constraints)
+  let placeo ~get_group_sched t teacher_sched group_sched =
+    let _ : 'a -> schedule_injected = get_group_sched in
+    let _ : schedule_injected = teacher_sched in
+    let _ : schedule_injected = group_sched in
+    function
+    | Plan_item.Normal { group_id; teacher_id; lesson_id; constraints } ->
+      let para = Para.lesson ~group_id ~teacher_id ~course_id:lesson_id in
+      let open OCanren in
+      condeep_map (shrink_placement t constraints) ~f:(fun (i, j) ->
+        Schedule.is teacher_sched i j para
+        &&& Schedule.is group_sched i j para
+        &&&& apply_para_constraints ~get_group_sched i j constraints)
+    | Elective _ -> assert false
   ;;
 
   (* arr_foldi
@@ -307,31 +336,35 @@ module Plan = struct
         Hashtbl.replace col.group_of_id id g;
         id
     in
-    { Plan_item.group_id; lesson_id; teacher_id = t; constraints = cstrnts }
+    Plan_item.Normal { group_id; lesson_id; teacher_id = t; constraints = cstrnts }
   ;;
 
   let of_pre_plan : pre_plan -> t =
-    List.map (fun ({ Plan_item.constraints; _ } as item) ->
-      let constraints =
-        List.map
-          (function
-            | Plan_item.Dont_ovelap gname ->
-              Plan_item.Dont_ovelap (Hashtbl.find col.id_of_group gname)
-            | Hardcode _ as c -> c)
-          constraints
-      in
-      { item with constraints })
+    List.map (function
+      | Plan_item.Normal { lesson_id; group_id; teacher_id; constraints } ->
+        let constraints =
+          List.map
+            (function
+              | Plan_item.Dont_ovelap gname ->
+                Plan_item.Dont_ovelap (Hashtbl.find col.id_of_group gname)
+              | Hardcode _ as c -> c)
+            constraints
+        in
+        Plan_item.Normal { lesson_id; group_id; teacher_id; constraints }
+      | Plan_item.Elective _ -> assert false)
   ;;
 end
 
 let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
   let open OCanren in
   Stdlib.List.fold_left
-    (fun acc ({ Plan_item.group_id; teacher_id; _ } as item) ->
-      let teacher_sched = get_teacher_sched teacher_id in
-      let group_sched = get_group_sched group_id in
-      let teacher = get_teacher teacher_id in
-      acc &&& Teacher.placeo ~get_group_sched teacher teacher_sched group_sched item)
+    (fun acc -> function
+      | Plan_item.Normal { group_id; teacher_id; _ } as item ->
+        let teacher_sched = get_teacher_sched teacher_id in
+        let group_sched = get_group_sched group_id in
+        let teacher = get_teacher teacher_id in
+        acc &&& Teacher.placeo ~get_group_sched teacher teacher_sched group_sched item
+      | Plan_item.Elective _ -> assert false)
     success
     plan
 ;;

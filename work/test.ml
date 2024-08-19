@@ -42,13 +42,17 @@ let run ~groups teachers plan : _ =
   let _ : Plan.pre_plan = plan in
   let all_groups =
     List.fold_left
-      (fun acc { Plan_item.group_id; _ } ->
-        let gname = Plan.group_of_id group_id in
-        if not (List.mem_assoc gname groups)
-        then (
-          let () = Printf.eprintf "No recorded group %S with id=%d\n%!" gname group_id in
-          failwith "No recorded group ");
-        Int_set.add group_id acc)
+      (fun acc -> function
+        | Plan_item.Normal { group_id; _ } ->
+          let gname = Plan.group_of_id group_id in
+          if not (List.mem_assoc gname groups)
+          then (
+            let () =
+              Printf.eprintf "No recorded group %S with id=%d\n%!" gname group_id
+            in
+            failwith "No recorded group ");
+          Int_set.add group_id acc
+        | Elective _ -> assert false)
       Int_set.empty
       plan
   in
@@ -147,7 +151,7 @@ let test1 () =
     ; Teacher.create "Рябов" []
     ; Teacher.create "Евдокимова" []
     ; Teacher.create "Федорченко" []
-    ; Teacher.create "Мод.дин.сис." []
+    ; Teacher.create "Ампилова" []
     ]
   in
   let plan : Plan.pre_plan =
@@ -155,7 +159,7 @@ let test1 () =
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
-    ; Plan.make ~g:"ТП4" ~t:"Мод.дин.сис." "Мод.дин.сис."
+    ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис."
     ; Plan.make ~g:"ТП4" ~t:"Соловьёв" "ТВПиС" (* ~cstrnts:[ Hardcode (1, 1) ]*)
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" ~cstrnts:[ Dont_ovelap "ТП3" ] "ФП"
     ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
