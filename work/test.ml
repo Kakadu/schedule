@@ -38,11 +38,17 @@ let measure f x =
   Int64.(div (Mtime.Span.to_uint64_ns diff) 1_000_000L), ans
 ;;
 
-let run teachers plan : _ =
+let run ~groups teachers plan : _ =
   let _ : Plan.pre_plan = plan in
   let all_groups =
     List.fold_left
-      (fun acc { Plan_item.group_id; _ } -> Int_set.add group_id acc)
+      (fun acc { Plan_item.group_id; _ } ->
+        let gname = Plan.group_of_id group_id in
+        if not (List.mem_assoc gname groups)
+        then (
+          let () = Printf.eprintf "No recorded group %S with id=%d\n%!" gname group_id in
+          failwith "No recorded group ");
+        Int_set.add group_id acc)
       Int_set.empty
       plan
   in
@@ -57,7 +63,16 @@ let run teachers plan : _ =
           Hashtbl.add group_shedules gid shed;
           (* log "Group shedules count = %d" (Hashtbl.length group_shedules); *)
           (* log "all_groups count = %d" (Int_set.cardinal all_groups); *)
-          acc &&& Lib.init_empty_schedule shed &&& Lib.schedule_without_windows shed))
+          let group_constraints =
+            try List.assoc (Plan.group_of_id gid) groups with
+            | Not_found -> []
+          in
+          acc
+          &&& Lib.init_empty_schedule shed
+          &&& Lib.schedule_without_windows shed
+          &&& conj_map group_constraints ~f:(function
+            | Constraint.Bad_day day -> Schedule.bad_dayo day shed
+            | Bad_lesson _ -> success)))
       all_groups
       OCanren.success
   in
@@ -114,6 +129,15 @@ let cfg = { out_tex_file = "" }
 
 let test1 () =
   Plan.clear ();
+  let groups =
+    let make ?(c = []) name = name, c in
+    [ make ~c:[ Constraint.Bad_day 2 ] "ПИ2"
+    ; make ~c:[ Constraint.Bad_day 4 ] "ТП3"
+    ; make ~c:[ Constraint.Bad_day 4 ] "ПИ3"
+    ; make ~c:[ Constraint.Bad_day 0 ] "ТП4"
+    ; make ~c:[ Constraint.Bad_day 0 ] "ПИ4"
+    ]
+  in
   let teachers =
     [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]
     ; Teacher.create "Соловьёв" []
@@ -122,7 +146,7 @@ let test1 () =
     ; Teacher.create "ТеорВ-практик" []
     ; Teacher.create "Рябов" []
     ; Teacher.create "Евдокимова" []
-    ; Teacher.create "Хит" []
+    ; Teacher.create "Федорченко" []
     ; Teacher.create "Мод.дин.сис." []
     ]
   in
@@ -132,8 +156,8 @@ let test1 () =
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
     ; Plan.make ~g:"ТП4" ~t:"Мод.дин.сис." "Мод.дин.сис."
-    ; Plan.make ~cstrnts:[ Hardcode (1, 1) ] ~g:"ТП4" ~t:"Соловьёв" "ТВПиС"
-    ; Plan.make ~cstrnts:[ Dont_ovelap "ТП3" ] ~g:"ТП4" ~t:"Kakadu" "ФП"
+    ; Plan.make ~g:"ТП4" ~t:"Соловьёв" "ТВПиС" (* ~cstrnts:[ Hardcode (1, 1) ]*)
+    ; Plan.make ~g:"ТП4" ~t:"Kakadu" ~cstrnts:[ Dont_ovelap "ТП3" ] "ФП"
     ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
     ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
     ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
@@ -141,11 +165,11 @@ let test1 () =
     ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
     ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
     ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
-    ; Plan.make ~g:"ТП3" ~t:"Хит" "ТФЯТ 1"
-    ; Plan.make ~g:"ТП3" ~t:"Хит" "ТФЯТ 2"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 1"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 2"
     ]
   in
-  let g_sched, teachers_sched = run teachers plan in
+  let g_sched, teachers_sched = run ~groups teachers plan in
   let g_sched =
     List.sort
       (fun (a, _) (b, _) -> String.compare (Plan.group_of_id a) (Plan.group_of_id b))

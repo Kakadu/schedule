@@ -77,6 +77,21 @@ module Schedule = struct
   ;;
 
   let make_window sched i j = is sched i j Para.blank
+  let blank_day = Std.list Fun.id [ Para.blank; Para.blank; Para.blank; Para.blank ]
+
+  let bad_dayo day sched : goal =
+    fresh
+      (m tu w th fr sa)
+      (sched === Std.list Fun.id [ m; tu; w; th; fr; sa ])
+      (match day with
+       | 0 -> m === blank_day
+       | 1 -> blank_day === tu
+       | 2 -> blank_day === w
+       | 3 -> blank_day === th
+       | 4 -> blank_day === fr
+       | 5 -> blank_day === sa
+       | _ -> assert false)
+  ;;
 end
 
 let init_empty_schedule : Schedule.injected -> OCanren.goal =
