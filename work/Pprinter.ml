@@ -39,8 +39,17 @@ let pp_para_teacher pp_gid ppf =
   | _ -> assert false
 ;;
 
-let pp_para_group pp_gid ppf =
+let pp_para_group pp_gid ppf : Stud_para.logic -> _ =
   let open OCanren in
+  let project_electives =
+    let rec helper acc = function
+      | Value OCanren.Std.List.Nil -> acc
+      | Var _ -> failwith "Bad argument"
+      | Value (Cons (Value (Value l, Value r), rest)) -> helper ((l, r) :: acc) rest
+      | _ -> assert false
+    in
+    helper []
+  in
   function
   | OCanren.Var _ ->
     (* print_endline ([%show: Para.logic] () v); *)
@@ -51,6 +60,13 @@ let pp_para_group pp_gid ppf =
      | Lesson (OCanren.Value _, Value tid, Value lesid) ->
        fprintf ppf {|   \makecell{\small %s \\ %s}|} lesid tid
      | _ -> assert false)
+  | Value (Stud_para.Elective (Value elename, lessons)) ->
+    let electives = project_electives lessons in
+    fprintf
+      ppf
+      {|   \makecell{\small %s %s }|}
+      elename
+      (String.concat "" (List.map (fun (a, b) -> sprintf "\\\\ %s %s" a b) electives))
   | _ -> assert false
 ;;
 
