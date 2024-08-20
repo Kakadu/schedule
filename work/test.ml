@@ -246,7 +246,7 @@ let test1 () =
     ; Plan.make_elective
         ~g:"ТП3"
         "Elective 3"
-        [ "Zelen4uk", "Networks"; "Granichin", "MltuagentStuff"; "Kakadu", "ФП" ]
+        [ "Zelen4uk", "Networks"; "Granichin", "MultiAgentStuff"; "Kakadu", "ФП" ]
     ]
   in
   let g_sched, teachers_sched = run ~groups teachers plan in
