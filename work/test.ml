@@ -96,7 +96,12 @@ let run ~groups teachers plan : _ =
       OCanren.success
       teachers
   in
-  let get_teacher tid = List.find (fun { Teacher.id; _ } -> tid = id) teachers in
+  let get_teacher tid =
+    try List.find (fun { Teacher.id; _ } -> tid = id) teachers with
+    | Not_found ->
+      Printf.eprintf "Can't find a teacher wit id = %s\n" tid;
+      exit 1
+  in
   let get_teacher_sched tid =
     (* log "Teacher shedules count = %d" (Hashtbl.length teacher_shedules); *)
     (* log "Teachers count = %d" (List.length teachers); *)
@@ -151,37 +156,97 @@ let test1 () =
   in
   let teachers =
     [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]
-    ; Teacher.create "Solovjov" []
+    ; Teacher.create "Ампилова" []
     ; Teacher.create "Azimov" []
-      (* ; Teacher.create "Виденский" []
-         ; Teacher.create "Невзоров" []
-         ; Teacher.create "ТеорВ-практик" []
-         ; Teacher.create "Рябов" []
-         ; Teacher.create "Евдокимова" []
-         ; Teacher.create "Федорченко" []
-         ; Teacher.create "Ампилова" [] *)
+    ; Teacher.create "Виденский" []
+    ; Teacher.create "ГригоревД" []
+    ; Teacher.create "Gorihovsky" []
+    ; Teacher.create "Granichin" []
+    ; Teacher.create "Евдокимова" []
+    ; Teacher.create "Khanov" []
+    ; Teacher.create "Zelen4uk" []
+    ; Teacher.create "Kosovskaya" []
+    ; Teacher.create "Litvinov" []
+    ; Teacher.create "Luciv" []
+    ; Teacher.create "LocalApprox" []
+    ; Teacher.create "Mikhailova" []
+    ; Teacher.create "Miroshnichenko" []
+    ; Teacher.create "Невзоров" []
+    ; Teacher.create "Ponomarjova" []
+    ; Teacher.create "Рябов" []
+    ; Teacher.create "Salischev" []
+    ; Teacher.create "Solovjov" []
+    ; Teacher.create "Shilov" []
+    ; Teacher.create "Starchak" []
+    ; Teacher.create "Сысоев" []
+    ; Teacher.create "ТеорВ-практик" []
+    ; Teacher.create "Terekhov" []
+    ; Teacher.create "Tulupjeva" []
+    ; Teacher.create "Федорченко" []
     ]
   in
   let plan : Plan.pre_plan =
-    [ Plan.make_elective ~g:"ТП4" "Elective3" [ "Kakadu", "ФП"; "Solovjov", "РЛП" ]
-      (* ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1" *)
-    ; Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
-      (* ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2" *)
-
-      (* ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции" *)
-      (* ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис." *)
-      (* ; Plan.make ~g:"ТП4" ~t:"Solovjov" "ТВПиС" *)
+    [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
+    ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
+    ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
+    ; Plan.make_elective
+        ~g:"ТП4"
+        "Elective 3"
+        [ "Kakadu", "ФП"
+        ; "Solovjov", "РЛП"
+        ; "Gorihovsky", "Rust"
+        ; "LocalApprox", "LocalApprox"
+        ]
+    ; Plan.make_elective
+        ~g:"ТП4"
+        "Elective 1"
+        [ "Евдокимова", "Распараллеливание"
+        ; "Сысоев", "Internet"
+        ; "Ампилова", "Papers"
+        ; "Luciv", "NOSQL"
+        ; (* 002295*)
+          "ГригоревД", ".NET"
+        ; "Khanov", "Infobez"
+        ]
+    ; Plan.make_elective
+        ~g:"ТП4"
+        "Elective 2"
+        [ "Granichin", "Stochastic"; "Shilov", "Сис.п.с.сис"; "Kakadu", "Трансляции" ]
+    ; Plan.make_elective
+        ~g:"ТП4"
+        "Elective 4"
+        [ "Starchak", "Конкретная математика"; "Kosovskaya", "Анализ алгоритмов" ]
+    ; Plan.make_elective
+        ~g:"ТП4"
+        "Elective 5"
+        [ "Ponomarjova", "Petri"; "Litvinov", "SoftConstr"; "Mikhailova", "СУБД" ]
+    ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис."
+    ; Plan.make ~g:"ТП4" ~t:"Solovjov" "ТВПиС"
+    ; Plan.make ~g:"ТП4" ~t:"Shilov" "Arch.sys.netw."
       (* ~cstrnts:[ Hardcode (1, 1) ]*)
       (* ; Plan.make ~g:"ТП4" ~t:"Kakadu" ~cstrnts:[ Dont_ovelap "ТП3" ] "ФП"
-         ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
-         ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
-         ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
-         ; Plan.make ~g:"ТП3" ~t:"Невзоров" "Теорвер Л"
-         ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
-         ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
-         ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
-         ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 1"
-         ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 2" *)
+         ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП" *)
+    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
+    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
+    ; Plan.make ~g:"ТП3" ~t:"Невзоров" "Теорвер Л"
+    ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
+    ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
+    ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л1"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л2"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ (п)"
+    ; Plan.make_elective
+        ~g:"ТП3"
+        "Elective 1"
+        [ "Starchak", "ATP"; "Terekhov", "SysProg"; "Mikhailova", "Indexing" ]
+    ; Plan.make_elective
+        ~g:"ТП3"
+        "Elective 2"
+        [ "Salischev", "Java"; "Miroshnichenko", "Parallel"; "Tulupjeva", "DataScience" ]
+    ; Plan.make_elective
+        ~g:"ТП3"
+        "Elective 3"
+        [ "Zelen4uk", "Networks"; "Granichin", "MltuagentStuff"; "Kakadu", "ФП" ]
     ]
   in
   let g_sched, teachers_sched = run ~groups teachers plan in

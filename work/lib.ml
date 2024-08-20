@@ -432,7 +432,11 @@ let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
           let choices = Teacher.fold_matrix (fun _ _ acc -> acc + 1) 0 joined_arr in
           if choices <= 0
           then failwith "No choices"
-          else Printf.printf "There are %d choices for elective %S\n%!" choices title
+          else (
+            let __ () =
+              Printf.printf "There are %d choices for elective %S\n%!" choices title
+            in
+            ())
         in
         let group_sched : Stud_para.injected Schedule.injected =
           get_group_sched group_id
@@ -440,7 +444,7 @@ let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
         acc
         &&&& ListLabels.fold_left
                ~f:(fun acc (i, j) ->
-                 Printf.printf "Iterating over %d,%d\n%!" i j;
+                 (* Printf.printf "Iterating over %d,%d\n%!" i j; *)
                  condeep
                    [ acc
                    ; conj_map electives ~f:(fun (teacher_id, course_id) ->
