@@ -3,19 +3,22 @@ open Lib
 include struct
   open OCanren
 
-  type 'a assoc_schedule =
-    ('a ilogic, Schedule.injected) Std.Pair.injected Std.List.injected
+  type ('a, 'para) assoc_schedule =
+    ('a ilogic, 'para Schedule.injected) Std.Pair.injected Std.List.injected
 
-  type injected_answer = (int assoc_schedule, string assoc_schedule) Std.Pair.injected
+  type injected_answer =
+    ( (int, Stud_para.injected) assoc_schedule
+      , (string, Para.injected) assoc_schedule )
+      Std.Pair.injected
 
   type main_reifier = (injected_answer, 'g * 't) Reifier.t
-    constraint 'g = (int * Schedule.reifed) Std.List.ground
-    constraint 't = (GT.string * Schedule.reifed) Std.List.ground
+    constraint 'g = (int * Stud_para.logic Schedule.reifed) Std.List.ground
+    constraint 't = (GT.string * Para.logic Schedule.reifed) Std.List.ground
 
   let reify_delogic_sheds : main_reifier =
     Std.Pair.prj_exn
-      (Std.List.prj_exn (Std.Pair.prj_exn prj_exn Schedule.reify))
-      (Std.List.prj_exn (Std.Pair.prj_exn prj_exn Schedule.reify))
+      (Std.List.prj_exn (Std.Pair.prj_exn prj_exn (Schedule.reify Stud_para.reify)))
+      (Std.List.prj_exn (Std.Pair.prj_exn prj_exn (Schedule.reify Para.reify)))
   ;;
 
   let inject_into_single ~group_shedules ~teacher_shedules (sheds : injected_answer) =
@@ -56,7 +59,7 @@ let run ~groups teachers plan : _ =
       Int_set.empty
       plan
   in
-  let group_shedules : (group_id, Schedule.injected) Hashtbl.t =
+  let group_shedules : (group_id, Stud_para.injected Schedule.injected) Hashtbl.t =
     Hashtbl.create (Int_set.cardinal all_groups)
   in
   let init_group_sheds =
@@ -73,14 +76,14 @@ let run ~groups teachers plan : _ =
           in
           acc
           &&& Lib.init_empty_schedule shed
-          &&& Lib.schedule_without_windows shed
+          (* &&& Lib.schedule_without_windows shed *)
           &&& conj_map group_constraints ~f:(function
-            | Constraint.Bad_day day -> Schedule.bad_dayo day shed
+            | Constraint.Bad_day day -> Schedule.bad_dayo day Stud_para.blank shed
             | Bad_lesson _ -> success)))
       all_groups
       OCanren.success
   in
-  let teacher_shedules : (string, Schedule.injected) Hashtbl.t =
+  let teacher_shedules : (string, Para.injected Schedule.injected) Hashtbl.t =
     Hashtbl.create (List.length teachers)
   in
   let init_teacher_sheds =
@@ -191,12 +194,12 @@ let test1 () =
       Pprinter.start_section ppf "Преподы";
       List.iter
         (fun (tid, sched) ->
-          Pprinter.out_shedule pp_gid Format.pp_print_string tid ppf sched)
+          Pprinter.out_teachers_schedule pp_gid Format.pp_print_string tid ppf sched)
         teachers_sched;
       Pprinter.start_section ppf "Студенческие группы";
       List.iter
         (fun (tid, sched) ->
-          Pprinter.(out_shedule ~kind:Group)
+          Pprinter.out_student_schedule
             pp_gid
             Format.pp_print_string
             (Plan.group_of_id tid)
