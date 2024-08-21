@@ -61,7 +61,7 @@
  (mode
   (promote (until-clean)))
  (action
-  (run xelatex --interaction=errorstopmode %{deps})))
+  (run xelatex --interaction=batchmode %{deps})))
 
 (library
  (name tests)
