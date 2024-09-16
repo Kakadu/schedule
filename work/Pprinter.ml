@@ -24,9 +24,10 @@ let header ppf () =
 |}
 ;;
 
+let start_section ppf name = fprintf ppf "\\section{%s}\n\n" name
 let footer ppf () = fprintf ppf {|\end{document} %!|}
 
-let pp_para kind pp_gid ppf =
+let pp_para_teacher pp_gid ppf =
   let open OCanren in
   function
   | OCanren.Var _ ->
@@ -34,13 +35,26 @@ let pp_para kind pp_gid ppf =
     ()
   | OCanren.Value Para.Window -> fprintf ppf "---"
   | Value (Lesson (OCanren.Value gid, Value tid, Value lesid)) ->
-    (match kind with
-     | Teacher -> fprintf ppf {| \makecell{\small %a \\ %s}|} pp_gid gid lesid
-     | Group -> fprintf ppf {|   \makecell{\small %s \\ %s}|} lesid tid)
+    fprintf ppf {| \makecell{\small %a \\ %s}|} pp_gid gid lesid
   | _ -> assert false
 ;;
 
-let out_shedule ?(kind = Teacher) pp_group_id pp_id id ppf (sh : Schedule.reifed) =
+let pp_para_group pp_gid ppf =
+  let open OCanren in
+  function
+  | OCanren.Var _ ->
+    (* print_endline ([%show: Para.logic] () v); *)
+    ()
+  | Value (Stud_para.Default (Value Para.Window)) -> fprintf ppf "---"
+  | Value (Stud_para.Default (Value x)) ->
+    (match x with
+     | Lesson (OCanren.Value _, Value tid, Value lesid) ->
+       fprintf ppf {|   \makecell{\small %s \\ %s}|} lesid tid
+     | _ -> assert false)
+  | _ -> assert false
+;;
+
+let out_shedule pp_group_id pp_id id pp_para ppf (sh : _ Schedule.reifed) =
   let printfn fmt = kasprintf (fprintf ppf "%s\n") fmt in
   printfn "\n";
   printfn {|\begin{frame}|};
@@ -51,7 +65,7 @@ let out_shedule ?(kind = Teacher) pp_group_id pp_id id ppf (sh : Schedule.reifed
   for i = 1 to 4 do
     let line = List.map (fun xs -> List.nth xs (i - 1)) sh in
     fprintf ppf "%d " i;
-    List.iter (fun p -> fprintf ppf " & %a" (pp_para kind pp_group_id) p) line;
+    List.iter (fun p -> fprintf ppf " & %a" (pp_para pp_group_id) p) line;
     printfn "\\\\";
     ()
   done;
@@ -62,4 +76,12 @@ let out_shedule ?(kind = Teacher) pp_group_id pp_id id ppf (sh : Schedule.reifed
   fprintf ppf "%!"
 ;;
 
-let start_section ppf name = fprintf ppf "\\section{%s}\n\n" name
+let out_teachers_schedule pp_group_id pp_id id ppf shed =
+  let _ : Para.logic Schedule.reifed = shed in
+  out_shedule pp_group_id pp_id id pp_para_teacher ppf shed
+;;
+
+let out_student_schedule pp_group_id pp_id id ppf shed =
+  let _ : Stud_para.logic Schedule.reifed = shed in
+  out_shedule pp_group_id pp_id id pp_para_group ppf shed
+;;
