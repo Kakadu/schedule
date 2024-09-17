@@ -46,7 +46,7 @@ let run ~groups teachers plan : _ =
   let all_groups =
     List.fold_left
       (fun acc -> function
-        | Plan_item.Normal { group_id; _ } ->
+        | Plan_item.Normal { group_id; _ } | Elective { group_id; _ } ->
           let gname = Plan.group_of_id group_id in
           if not (List.mem_assoc gname groups)
           then (
@@ -54,8 +54,7 @@ let run ~groups teachers plan : _ =
               Printf.eprintf "No recorded group %S with id=%d\n%!" gname group_id
             in
             failwith "No recorded group ");
-          Int_set.add group_id acc
-        | Elective _ -> assert false)
+          Int_set.add group_id acc)
       Int_set.empty
       plan
   in
@@ -119,7 +118,12 @@ let run ~groups teachers plan : _ =
             &&&& delay (fun () ->
               Lib.synth get_teacher ~get_teacher_sched ~get_group_sched plan))
           Fun.id
-        |> OCanren.Stream.hd)
+        |> fun stream ->
+        match OCanren.Stream.msplit stream with
+        | None ->
+          Printf.eprintf "NO ANSWERS\n%!";
+          exit 1
+        | Some (h, _) -> h)
       ()
   in
   let time2, ans =
@@ -147,33 +151,37 @@ let test1 () =
   in
   let teachers =
     [ Teacher.create "Kakadu" [ Bad_day 3; Bad_lesson 0 ]
-    ; Teacher.create "Соловьёв" []
-    ; Teacher.create "Виденский" []
-    ; Teacher.create "Невзоров" []
-    ; Teacher.create "ТеорВ-практик" []
-    ; Teacher.create "Рябов" []
-    ; Teacher.create "Евдокимова" []
-    ; Teacher.create "Федорченко" []
-    ; Teacher.create "Ампилова" []
+    ; Teacher.create "Solovjov" []
+    ; Teacher.create "Azimov" []
+      (* ; Teacher.create "Виденский" []
+         ; Teacher.create "Невзоров" []
+         ; Teacher.create "ТеорВ-практик" []
+         ; Teacher.create "Рябов" []
+         ; Teacher.create "Евдокимова" []
+         ; Teacher.create "Федорченко" []
+         ; Teacher.create "Ампилова" [] *)
     ]
   in
   let plan : Plan.pre_plan =
-    [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
-    ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
-    ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
-    ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции"
-    ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис."
-    ; Plan.make ~g:"ТП4" ~t:"Соловьёв" "ТВПиС" (* ~cstrnts:[ Hardcode (1, 1) ]*)
-    ; Plan.make ~g:"ТП4" ~t:"Kakadu" ~cstrnts:[ Dont_ovelap "ТП3" ] "ФП"
-    ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
-    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
-    ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
-    ; Plan.make ~g:"ТП3" ~t:"Невзоров" "Теорвер Л"
-    ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
-    ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
-    ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
-    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 1"
-    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 2"
+    [ Plan.make_elective ~g:"ТП4" "Elective3" [ "Kakadu", "ФП"; "Solovjov", "РЛП" ]
+      (* ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1" *)
+    ; Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
+      (* ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2" *)
+
+      (* ; Plan.make ~g:"ТП4" ~t:"Kakadu" "Трансляции" *)
+      (* ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис." *)
+      (* ; Plan.make ~g:"ТП4" ~t:"Solovjov" "ТВПиС" *)
+      (* ~cstrnts:[ Hardcode (1, 1) ]*)
+      (* ; Plan.make ~g:"ТП4" ~t:"Kakadu" ~cstrnts:[ Dont_ovelap "ТП3" ] "ФП"
+         ; Plan.make ~g:"ТП3" ~t:"Kakadu" "ФП"
+         ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 1"
+         ; Plan.make ~g:"ТП3" ~t:"Виденский" "ФункАн 2"
+         ; Plan.make ~g:"ТП3" ~t:"Невзоров" "Теорвер Л"
+         ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
+         ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
+         ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
+         ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 1"
+         ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ 2" *)
     ]
   in
   let g_sched, teachers_sched = run ~groups teachers plan in

@@ -37,13 +37,21 @@ end
 module Stud_para = struct
   [%%ocanren_inject
     type nonrec ground =
-      | Elective of GT.string * GT.string
+      | Elective of GT.string * (GT.string * GT.string) OCanren.Std.List.ground
       | Default of Para.ground
     [@@deriving gt ~options:{ gmap; show }]]
 
-  let elective ~teacher_id ~course_id : injected =
+  let _ = elective
+  (*
+     type reified =
+     (GT.string, (GT.string * GT.string) OCanren.Std.List.ground, Para.logic) t
+     OCanren.logic
+
+     let smart_reify : OCanren.Reifier.t (injected,reified) = *)
+
+  let elective title xs : injected =
     let open OCanren in
-    elective !!teacher_id !!course_id
+    OCanren.inj (Elective (!!title, Std.list (fun (a, b) -> Std.pair !!a !!b) xs))
   ;;
 
   let blank : injected = default Para.blank
@@ -173,7 +181,8 @@ module Plan_item = struct
         ; constraints : 'gid cstrnt list
         }
     | Elective of
-        { group_id : group_id
+        { title : string
+        ; group_id : group_id
         ; electives : (teacher_id * Lesson.id) list
         }
 end
@@ -188,25 +197,71 @@ module Teacher = struct
     ; indexes : (int * int) list
     }
 
+  let day_count = 6
+  let pair_per_day = 4
+
+  let arr_allow_anyting () =
+    Array.init day_count (fun _ -> Array.init pair_per_day (fun _ -> true))
+  ;;
+
+  let foreach_matrix f arr =
+    for i = 0 to day_count - 1 do
+      for j = 0 to pair_per_day - 1 do
+        f i j arr.(i).(j)
+      done
+    done
+  ;;
+
+  let fold_matrix f acc arr =
+    let rec loopj i j acc =
+      if j >= pair_per_day
+      then acc
+      else if arr.(i).(j)
+      then loopj i (1 + j) (f i j acc)
+      else loopj i (1 + j) acc
+    in
+    let rec loopi i acc =
+      if i >= day_count
+      then acc
+      else (
+        let acc = loopj i 0 acc in
+        loopi (1 + i) acc)
+    in
+    loopi 0 acc
+  ;;
+
+  let decribe_matrix title m =
+    let choices = fold_matrix (fun _ _ acc -> acc + 1) 0 m in
+    if choices <= 0
+    then (
+      Printf.printf " Teacher %S has NO choices\n" title;
+      false)
+    else (
+      Printf.printf "There are %d choices for teacher %S\n%!" choices title;
+      true)
+  ;;
+
+  let indexes_of_matrix arr =
+    let indexes = ref [] in
+    foreach_matrix (fun i j flg -> if flg then indexes := (i, j) :: !indexes) arr;
+    !indexes
+  ;;
+
   let create id constraints =
-    let arr = Array.init 6 (fun _ -> Array.init 4 (fun _ -> true)) in
-    constraints
-    |> List.iter (function
+    let arr = arr_allow_anyting () in
+    ListLabels.iter constraints ~f:(function
       | Constraint.Bad_day n ->
-        for i = 0 to 4 - 1 do
+        for i = 0 to pair_per_day - 1 do
           arr.(n).(i) <- false
         done
       | Bad_lesson n ->
-        for i = 0 to 6 - 1 do
+        for i = 0 to day_count - 1 do
           arr.(i).(n) <- false
         done);
-    let indexes = ref [] in
-    for i = 0 to 5 do
-      for j = 0 to 3 do
-        if arr.(i).(j) then indexes := (i, j) :: !indexes
-      done
-    done;
-    { id; constraints; arr; indexes = !indexes }
+    let indexes = indexes_of_matrix arr in
+    let () = if constraints = [] then assert (List.length indexes = 6 * 4) in
+    assert (decribe_matrix id arr);
+    { id; constraints; arr; indexes }
   ;;
 
   type schedule_injected = Para.injected Schedule.injected
@@ -282,27 +337,6 @@ module Teacher = struct
         &&&& apply_para_constraints ~get_group_sched i j constraints)
     | Elective _ -> assert false
   ;;
-
-  (* arr_foldi
-     (fun i acc ->
-     arr_foldi
-     (fun j acc _ ->
-     if t.arr.(i).(j)
-     then
-     conde
-     [ acc
-                ; Schedule.is teacher_sched i j para
-                  &&& Schedule.is group_sched i j para
-                  &&&& apply_para_constraints
-                         ~get_group_sched
-                         i
-                         j
-                         item.Plan_item.constraints
-                ]
-     else acc)
-     acc)
-     OCanren.failure
-     t.arr *)
 end
 
 module Plan = struct
@@ -327,20 +361,30 @@ module Plan = struct
 
   let group_of_id = Hashtbl.find col.group_of_id
 
+  let register_group g =
+    match Hashtbl.find col.id_of_group g with
+    | id -> id
+    | exception Not_found ->
+      let id = col.last_id in
+      col.last_id <- 1 + col.last_id;
+      Hashtbl.replace col.id_of_group g id;
+      Hashtbl.replace col.group_of_id id g;
+      id
+  ;;
+
   let make ?(cstrnts = []) ~g ~t lesson_id =
-    let group_id =
-      match Hashtbl.find col.id_of_group g with
-      | id -> id
-      | exception Not_found ->
-        let id = col.last_id in
-        col.last_id <- 1 + col.last_id;
-        Hashtbl.replace col.id_of_group g id;
-        Hashtbl.replace col.group_of_id id g;
-        id
-    in
+    let group_id = register_group g in
     Plan_item.Normal { group_id; lesson_id; teacher_id = t; constraints = cstrnts }
   ;;
 
+  (** [make_elective title ~g lessons] when lessons is teacher/lesson list *)
+  let make_elective title ~g electives =
+    assert (electives <> []);
+    let group_id = register_group g in
+    Plan_item.Elective { title; group_id; electives }
+  ;;
+
+  (* Replaces string GIDs to grounp_id type *)
   let of_pre_plan : pre_plan -> t =
     List.map (function
       | Plan_item.Normal { lesson_id; group_id; teacher_id; constraints } ->
@@ -353,7 +397,7 @@ module Plan = struct
             constraints
         in
         Plan_item.Normal { lesson_id; group_id; teacher_id; constraints }
-      | Plan_item.Elective _ -> assert false)
+      | Plan_item.Elective x -> Plan_item.Elective x)
   ;;
 end
 
@@ -363,13 +407,53 @@ let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
   Stdlib.List.fold_left
     (fun acc -> function
       | Plan_item.Normal { group_id; teacher_id; _ } as item ->
-        let teacher_sched = get_teacher_sched teacher_id in
         let group_sched : Stud_para.injected Schedule.injected =
           get_group_sched group_id
         in
+        let teacher_sched = get_teacher_sched teacher_id in
         let teacher = get_teacher teacher_id in
         acc &&& Teacher.placeo ~get_group_sched teacher teacher_sched group_sched item
-      | Plan_item.Elective _ -> assert false)
+      | Elective { title; group_id; electives } ->
+        let joined_arr =
+          List.fold_left
+            (fun acc (tid, _) ->
+              let x = (get_teacher tid).arr in
+              if not (Teacher.decribe_matrix tid x) then exit 1;
+              Teacher.foreach_matrix (fun i j c -> acc.(i).(j) <- acc.(i).(j) && c) x;
+              acc)
+            (Teacher.arr_allow_anyting ())
+            electives
+        in
+        let indexes =
+          Teacher.indexes_of_matrix joined_arr
+          |> List.sort (fun (_, a) (_, b) -> Int.compare a b)
+        in
+        let () =
+          let choices = Teacher.fold_matrix (fun _ _ acc -> acc + 1) 0 joined_arr in
+          if choices <= 0
+          then failwith "No choices"
+          else Printf.printf "There are %d choices for elective %S\n%!" choices title
+        in
+        let group_sched : Stud_para.injected Schedule.injected =
+          get_group_sched group_id
+        in
+        acc
+        &&&& ListLabels.fold_left
+               ~f:(fun acc (i, j) ->
+                 Printf.printf "Iterating over %d,%d\n%!" i j;
+                 condeep
+                   [ acc
+                   ; conj_map electives ~f:(fun (teacher_id, course_id) ->
+                       let teacher_sched = get_teacher_sched teacher_id in
+                       Schedule.is
+                         teacher_sched
+                         i
+                         j
+                         (Para.lesson ~group_id ~teacher_id ~course_id))
+                     &&& Schedule.is group_sched i j (Stud_para.elective title electives)
+                   ])
+               ~init:failure
+               indexes)
     success
     plan
 ;;

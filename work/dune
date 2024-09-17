@@ -1,7 +1,12 @@
 (env
  (_
   (flags
-   (:standard -rectypes -warn-error -unused-var-strict))))
+   (:standard
+    -rectypes
+    -warn-error
+    -unused-var-strict
+    -warn-error
+    -unused-var))))
 
 (executable
  (name test)
