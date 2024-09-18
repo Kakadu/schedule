@@ -64,9 +64,11 @@ let pp_para_group pp_gid ppf : Stud_para.logic -> _ =
     let electives = project_electives lessons in
     fprintf
       ppf
-      {|   \makecell{\small %s %s }|}
+      {|   \makecell{\linespread{0.5}\tiny %s %s }|}
       elename
-      (String.concat "" (List.map (fun (a, b) -> sprintf "\\\\ %s %s" a b) electives))
+      (String.concat
+         ""
+         (List.map (fun (a, b) -> sprintf {|\\[-0.2cm]\tiny %s %s|} a b) electives))
   | _ -> assert false
 ;;
 
