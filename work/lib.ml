@@ -34,6 +34,29 @@ module Para = struct
   ;;
 end
 
+module Plan_item = struct
+  type 'gid cstrnt =
+    | Dont_ovelap of 'gid
+    | Hardcode of int * int
+
+  type 'gid elec = teacher_id * Lesson.id * 'gid cstrnt list
+
+  type 'gid t =
+    | Normal of
+        { group_id : group_id
+        ; lesson_id : Lesson.id
+        ; teacher_id : teacher_id
+        ; constraints : 'gid cstrnt list
+        }
+    | Elective of
+        { title : string
+        ; group_id : group_id
+        ; electives : 'gid elec list
+        }
+
+  let elec ?(c = []) ~t lesson : _ elec = t, lesson, c
+end
+
 module Stud_para = struct
   [%%ocanren_inject
     type nonrec ground =
@@ -168,25 +191,6 @@ let init_empty_schedule : _ Schedule.injected -> OCanren.goal =
    (wrap ~hack:true sat)
    ;; *)
 
-module Plan_item = struct
-  type 'gid cstrnt =
-    | Dont_ovelap of 'gid
-    | Hardcode of int * int
-
-  type 'gid t =
-    | Normal of
-        { group_id : group_id
-        ; lesson_id : Lesson.id
-        ; teacher_id : teacher_id
-        ; constraints : 'gid cstrnt list
-        }
-    | Elective of
-        { title : string
-        ; group_id : group_id
-        ; electives : (teacher_id * Lesson.id) list
-        }
-end
-
 module Teacher = struct
   type id = string
 
@@ -236,9 +240,8 @@ module Teacher = struct
     then (
       Printf.printf " Teacher %S has NO choices\n" title;
       false)
-    else (
-      Printf.printf "There are %d choices for teacher %S\n%!" choices title;
-      true)
+    else (* Printf.printf "There are %d choices for teacher %S\n%!" choices title; *)
+      true
   ;;
 
   let indexes_of_matrix arr =
@@ -372,9 +375,9 @@ module Plan = struct
       id
   ;;
 
-  let make ?(cstrnts = []) ~g ~t lesson_id =
+  let make ?(c = []) ~g ~t lesson_id =
     let group_id = register_group g in
-    Plan_item.Normal { group_id; lesson_id; teacher_id = t; constraints = cstrnts }
+    Plan_item.Normal { group_id; lesson_id; teacher_id = t; constraints = c }
   ;;
 
   (** [make_elective title ~g lessons] when lessons is teacher/lesson list *)
@@ -386,19 +389,34 @@ module Plan = struct
 
   (* Replaces string GIDs to grounp_id type *)
   let of_pre_plan : pre_plan -> t =
+    let fix_constraints =
+      List.map (function
+        | Plan_item.Dont_ovelap gname ->
+          Plan_item.Dont_ovelap (Hashtbl.find col.id_of_group gname)
+        | Hardcode _ as c -> c)
+    in
     List.map (function
       | Plan_item.Normal { lesson_id; group_id; teacher_id; constraints } ->
-        let constraints =
-          List.map
-            (function
-              | Plan_item.Dont_ovelap gname ->
-                Plan_item.Dont_ovelap (Hashtbl.find col.id_of_group gname)
-              | Hardcode _ as c -> c)
-            constraints
-        in
+        let constraints = fix_constraints constraints in
         Plan_item.Normal { lesson_id; group_id; teacher_id; constraints }
-      | Plan_item.Elective x -> Plan_item.Elective x)
+      | Plan_item.Elective { title; group_id; electives } ->
+        let electives = List.map (fun (a, b, cs) -> a, b, fix_constraints cs) electives in
+        Plan_item.Elective { title; group_id; electives })
   ;;
+end
+
+module Para_place_set = struct
+  include Set.Make (struct
+      type t = int * int
+
+      let compare (a, b) (c, d) =
+        match Int.compare a c with
+        | 0 -> Int.compare b d
+        | n -> n
+      ;;
+    end)
+
+  let is_singleton set = if cardinal set = 1 then Some (min_elt set) else None
 end
 
 let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
@@ -413,10 +431,22 @@ let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
         let teacher_sched = get_teacher_sched teacher_id in
         let teacher = get_teacher teacher_id in
         acc &&& Teacher.placeo ~get_group_sched teacher teacher_sched group_sched item
-      | Elective { title; group_id; electives } ->
+      | Plan_item.Elective { title; group_id; electives } ->
+        let get_preplaced : Para_place_set.t =
+          List.fold_left
+            (fun acc (_, _, elecs) ->
+              List.fold_left
+                (fun acc -> function
+                  | Plan_item.Hardcode (wd, n) -> Para_place_set.add (wd, n) acc
+                  | _ -> acc)
+                acc
+                elecs)
+            Para_place_set.empty
+            electives
+        in
         let joined_arr =
           List.fold_left
-            (fun acc (tid, _) ->
+            (fun acc (tid, _, _constraints) ->
               let x = (get_teacher tid).arr in
               if not (Teacher.decribe_matrix tid x) then exit 1;
               Teacher.foreach_matrix (fun i j c -> acc.(i).(j) <- acc.(i).(j) && c) x;
@@ -424,40 +454,59 @@ let synth get_teacher ~get_teacher_sched ~get_group_sched (plan : Plan.t) =
             (Teacher.arr_allow_anyting ())
             electives
         in
-        let indexes =
-          Teacher.indexes_of_matrix joined_arr
-          |> List.sort (fun (_, a) (_, b) -> Int.compare a b)
+        let place_into_paras indexes =
+          let () =
+            if indexes = []
+            then failwith "No choices"
+            else (
+              let __ () =
+                Printf.printf
+                  "There are %d choices for elective %S\n%!"
+                  (List.length indexes)
+                  title
+              in
+              ())
+          in
+          let group_sched : Stud_para.injected Schedule.injected =
+            get_group_sched group_id
+          in
+          acc
+          &&&& ListLabels.fold_left
+                 ~f:(fun acc (i, j) ->
+                   (* Printf.printf "Iterating over %d,%d\n%!" i j; *)
+                   condeep
+                     [ acc
+                     ; conj_map electives ~f:(fun (teacher_id, course_id, _constraints) ->
+                         let teacher_sched = get_teacher_sched teacher_id in
+                         Schedule.is
+                           teacher_sched
+                           i
+                           j
+                           (Para.lesson ~group_id ~teacher_id ~course_id))
+                       &&& Schedule.is
+                             group_sched
+                             i
+                             j
+                             (Stud_para.elective
+                                title
+                                (List.map (fun (a, b, _) -> a, b) electives))
+                     ])
+                 ~init:failure
+                 indexes
         in
-        let () =
-          let choices = Teacher.fold_matrix (fun _ _ acc -> acc + 1) 0 joined_arr in
-          if choices <= 0
-          then failwith "No choices"
-          else (
-            let __ () =
-              Printf.printf "There are %d choices for elective %S\n%!" choices title
-            in
-            ())
-        in
-        let group_sched : Stud_para.injected Schedule.injected =
-          get_group_sched group_id
-        in
-        acc
-        &&&& ListLabels.fold_left
-               ~f:(fun acc (i, j) ->
-                 (* Printf.printf "Iterating over %d,%d\n%!" i j; *)
-                 condeep
-                   [ acc
-                   ; conj_map electives ~f:(fun (teacher_id, course_id) ->
-                       let teacher_sched = get_teacher_sched teacher_id in
-                       Schedule.is
-                         teacher_sched
-                         i
-                         j
-                         (Para.lesson ~group_id ~teacher_id ~course_id))
-                     &&& Schedule.is group_sched i j (Stud_para.elective title electives)
-                   ])
-               ~init:failure
-               indexes)
+        (match Para_place_set.is_singleton get_preplaced with
+         | Some (day, n) when not joined_arr.(day).(n) ->
+           Format.eprintf "Bad input because of preplaced data for %S\n" title;
+           exit 1
+         | Some (day, n) ->
+           (* failwith "not implemented" *)
+           place_into_paras [ day, n ]
+         | None ->
+           let indexes =
+             Teacher.indexes_of_matrix joined_arr
+             |> List.sort (fun (_, a) (_, b) -> Int.compare a b)
+           in
+           place_into_paras indexes))
     success
     plan
 ;;

@@ -160,13 +160,13 @@ let test1 () =
     ; Teacher.create "Azimov" []
     ; Teacher.create "Виденский" []
     ; Teacher.create "ГригоревД" []
-    ; Teacher.create "Gorihovsky" []
+    ; Teacher.create "Gorihovsky" [ Bad_day 0; Bad_day 2 (* Bad_day 5 *) ]
     ; Teacher.create "Granichin" []
     ; Teacher.create "Евдокимова" []
     ; Teacher.create "Khanov" []
     ; Teacher.create "Zelen4uk" []
     ; Teacher.create "Kosovskaya" []
-    ; Teacher.create "Litvinov" []
+    ; Teacher.create "Litvinov" [ Bad_lesson 0 ]
     ; Teacher.create "Luciv" []
     ; Teacher.create "LocalApprox" []
     ; Teacher.create "Mikhailova" []
@@ -180,46 +180,61 @@ let test1 () =
     ; Teacher.create "Starchak" []
     ; Teacher.create "Сысоев" []
     ; Teacher.create "ТеорВ-практик" []
-    ; Teacher.create "Terekhov" []
+    ; Teacher.create "Terekhov" [ Bad_lesson 0; Bad_day 5 ]
     ; Teacher.create "Tulupjeva" []
-    ; Teacher.create "Федорченко" []
+    ; Teacher.create "Федорченко" [ Bad_day 0; Bad_day 1; Bad_day 2; Bad_day 3 ]
     ]
   in
   let plan : Plan.pre_plan =
-    [ Plan.make ~g:"ПИ2" ~t:"Kakadu" "ФП"
+    let elec = Plan_item.elec in
+    [ Plan.make ~g:"ПИ2" ~t:"Kakadu" ~c:[ Hardcode (4, 1) ] "ФП"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 1"
     ; Plan.make ~g:"ПИ3" ~t:"Kakadu" "Трансляции 2"
     ; Plan.make_elective
         ~g:"ТП4"
         "Elective 3"
-        [ "Kakadu", "ФП"
-        ; "Solovjov", "РЛП"
-        ; "Gorihovsky", "Rust"
-        ; "LocalApprox", "LocalApprox"
+        [ elec
+            ~t:"Kakadu"
+            ~c:[ (* not yet implemented *) Dont_ovelap "ТП3"; Hardcode (5, 1) ]
+            "ФП"
+        ; elec ~t:"Solovjov" "РЛП"
+        ; elec ~t:"Gorihovsky" "Rust"
+        ; elec ~t:"LocalApprox" "LocalApprox"
         ]
     ; Plan.make_elective
         ~g:"ТП4"
         "Elective 1"
-        [ "Евдокимова", "Распараллеливание"
-        ; "Сысоев", "Internet"
-        ; "Ампилова", "Papers"
-        ; "Luciv", "NOSQL"
+        [ elec ~t:"Евдокимова" "Распараллеливание"
+        ; elec ~t:"Сысоев" "Internet"
+        ; elec ~t:"Ампилова" "Papers"
+        ; elec ~t:"Luciv" "NOSQL"
         ; (* 002295*)
-          "ГригоревД", ".NET"
-        ; "Khanov", "Infobez"
+          elec ~t:"ГригоревД" ".NET"
+        ; elec ~t:"Khanov" "Infobez"
         ]
     ; Plan.make_elective
         ~g:"ТП4"
         "Elective 2"
-        [ "Granichin", "Stochastic"; "Shilov", "Сис.п.с.сис"; "Kakadu", "Трансляции" ]
+        [ elec ~t:"Granichin" "Stochastic"
+        ; elec ~t:"Shilov" "Сис.п.с.сис"
+        ; elec ~t:"Kakadu" "Трансляции"
+        ]
     ; Plan.make_elective
         ~g:"ТП4"
         "Elective 4"
-        [ "Starchak", "Конкретная математика"; "Kosovskaya", "Анализ алгоритмов" ]
+        [ elec ~t:"Starchak" "Конкретная математика"
+        ; elec ~t:"Kosovskaya" "Анализ алгоритмов"
+        ]
     ; Plan.make_elective
         ~g:"ТП4"
         "Elective 5"
-        [ "Ponomarjova", "Petri"; "Litvinov", "SoftConstr"; "Mikhailova", "СУБД" ]
+        [ elec ~t:"Ponomarjova" "Petri"
+        ; elec ~t:"Litvinov" "SoftConstr"
+        ; elec ~t:"Mikhailova" "СУБД"
+        ]
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л1"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л2"
+    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ (п)"
     ; Plan.make ~g:"ТП4" ~t:"Ампилова" "Мод.дин.сис."
     ; Plan.make ~g:"ТП4" ~t:"Solovjov" "ТВПиС"
     ; Plan.make ~g:"ТП4" ~t:"Shilov" "Arch.sys.netw."
@@ -232,21 +247,27 @@ let test1 () =
     ; Plan.make ~g:"ТП3" ~t:"ТеорВ-практик" "Теорвер П"
     ; Plan.make ~g:"ТП3" ~t:"Рябов" "ВыЧи (л)"
     ; Plan.make ~g:"ТП3" ~t:"Евдокимова" "ВыЧи (п)"
-    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л1"
-    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ л2"
-    ; Plan.make ~g:"ТП3" ~t:"Федорченко" "ТФЯТ (п)"
     ; Plan.make_elective
         ~g:"ТП3"
         "Elective 1"
-        [ "Starchak", "ATP"; "Terekhov", "SysProg"; "Mikhailova", "Indexing" ]
+        [ elec ~t:"Starchak" "ATP"
+        ; elec ~t:"Terekhov" "SysProg"
+        ; elec ~t:"Mikhailova" "Indexing"
+        ]
     ; Plan.make_elective
         ~g:"ТП3"
         "Elective 2"
-        [ "Salischev", "Java"; "Miroshnichenko", "Parallel"; "Tulupjeva", "DataScience" ]
+        [ elec ~t:"Salischev" "Java"
+        ; elec ~t:"Miroshnichenko" "Parallel"
+        ; elec ~t:"Tulupjeva" "DataScience"
+        ]
     ; Plan.make_elective
         ~g:"ТП3"
         "Elective 3"
-        [ "Zelen4uk", "Networks"; "Granichin", "MultiAgentStuff"; "Kakadu", "ФП" ]
+        [ elec ~t:"Zelen4uk" "Networks"
+        ; elec ~t:"Granichin" "MultiAgentStuff"
+        ; elec ~t:"Kakadu" "ФП"
+        ]
     ]
   in
   let g_sched, teachers_sched = run ~groups teachers plan in
